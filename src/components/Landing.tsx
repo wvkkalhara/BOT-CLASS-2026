@@ -177,7 +177,7 @@ export default function Landing({ onLogin }: Props) {
             <div className="glass overflow-hidden rounded-[2rem] p-2.5">
               <div className="relative overflow-hidden rounded-[1.55rem]">
                 <img
-                  src="/images/hero-robot.jpg"
+                  src="./images/hero-robot.jpg"
                   alt="bot class robot holding a circuit board"
                   className="aspect-[4/5] w-full object-cover"
                 />

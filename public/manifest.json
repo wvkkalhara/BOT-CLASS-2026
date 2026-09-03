@@ -2,9 +2,9 @@
   "name": "bot class — Robotics & Coding Tuition",
   "short_name": "bot class",
   "description": "Learn coding and hardware step-by-step through fun, practical projects for Grades 6 & 7.",
-  "id": "/",
-  "start_url": "/",
-  "scope": "/",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#070b1e",
@@ -13,7 +13,7 @@
   "categories": ["education"],
   "icons": [
     {
-      "src": "/icons/icon-512.png",
+      "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
