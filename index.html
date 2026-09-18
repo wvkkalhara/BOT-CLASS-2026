@@ -6,7 +6,16 @@
 <title>bot class — Robotics & Coding Academy</title>
 <meta name="description" content="Learn coding and hardware step-by-step through fun, practical projects for Grades 6 & 7." />
 <meta name="theme-color" content="#0a1024" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='8' y='18' width='48' height='36' rx='12' fill='%236366f1'/%3E%3Ccircle cx='24' cy='36' r='5' fill='%232dd4bf'/%3E%3Ccircle cx='40' cy='36' r='5' fill='%232dd4bf'/%3E%3Crect x='28' y='4' width='8' height='12' rx='4' fill='%232dd4bf'/%3E%3Ccircle cx='32' cy='6' r='5' fill='%23fbbf24'/%3E%3C/svg%3E" />
+<meta name="color-scheme" content="dark light" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="bot class" />
+<meta name="application-name" content="bot class" />
+<meta name="msapplication-TileColor" content="#0a1024" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="./icons/icon-192.svg" />
+<link rel="apple-touch-icon" href="./icons/icon-192.svg" />
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -171,6 +180,22 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .nav-link{padding:9px 14px;border-radius:11px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;transition:.2s;border:1px solid transparent;background:transparent}
 .nav-link:hover{color:var(--text);background:var(--surface-soft);border-color:var(--border)}
 .nav-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.pwa-install{display:none}
+.pwa-install.show{display:inline-flex}
+.pwa-install i{animation:installBounce 2.4s ease-in-out infinite}
+@keyframes installBounce{0%,70%,100%{transform:translateY(0)}80%{transform:translateY(3px)}90%{transform:translateY(-2px)}}
+@media(max-width:560px){
+  .nav-shell{gap:8px;padding-inline:10px}
+  .nav-right{gap:6px}
+  .pwa-install{width:40px;height:40px;padding:0;border-radius:12px}
+  .pwa-install .install-label{display:none}
+}
+@media(max-width:370px){.brand>div:last-child{display:none}}
+@media(display-mode:standalone){
+  #nav{padding-top:max(12px,env(safe-area-inset-top))}
+  .pwa-install{display:none!important}
+  body{padding-bottom:env(safe-area-inset-bottom)}
+}
 
 /* theme switch */
 .tswitch{width:54px;height:29px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface-soft);position:relative;cursor:pointer;flex-shrink:0;transition:background .3s}
@@ -446,6 +471,9 @@ main{padding-top:var(--nav-h)}
         <button class="nav-link" data-action="scroll" data-target="#instructor">Instructor</button>
       </nav>
       <div class="nav-right">
+        <button class="btn btn-teal btn-sm pwa-install" id="pwaInstallBtn" data-action="install-app" aria-label="Install bot class app" title="Install bot class">
+          <i class="fa-solid fa-download"></i><span class="install-label">Install</span>
+        </button>
         <button class="tswitch" id="themeToggle" data-action="theme" aria-label="Toggle dark and light mode">
           <span class="tsw-track"></span>
           <span class="tsw-knob"><i class="fa-solid fa-sun ico-sun"></i><i class="fa-regular fa-moon ico-moon"></i></span>
@@ -814,7 +842,7 @@ main{padding-top:var(--nav-h)}
 
 <script type="module">
 /* ==========================================================================
-   bot class — Single-file SPA
+   bot class — SPA + installable GitHub Pages PWA shell
    Firebase (RTDB + Auth) · html5-qrcode · qrcodejs · IndexedDB offline queue
    Suggested RTDB rules for this demo:
    { "rules": { ".read": true, ".write": "auth != null" } }
@@ -839,34 +867,90 @@ let analytics = null; try { analytics = getAnalytics(app); } catch(_) { /* unsup
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-/* ---------------- Service Worker (inline via Blob) ---------------- */
-(function registerSW(){
+/* ---------------- installable PWA ----------------
+   A real, same-origin sw.js is required by browsers for installation. Relative
+   paths keep this working when GitHub Pages hosts the app in a repository path. */
+let deferredInstallPrompt = null;
+let pwaRegistration = null;
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+function syncInstallButton(){
+  const btn = document.getElementById('pwaInstallBtn');
+  if (!btn) return;
+  btn.classList.toggle('show', !isStandalone());
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  syncInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  syncInstallButton();
+  toast('bot class is installed and ready from your home screen.', 'success', 4400);
+});
+
+async function installPwa(){
+  if (isStandalone()){
+    toast('bot class is already installed.', 'info');
+    return;
+  }
+  if (deferredInstallPrompt){
+    const prompt = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    await prompt.prompt();
+    const result = await prompt.userChoice;
+    if (result.outcome === 'accepted') toast('Installing bot class…', 'success');
+    else toast('Installation was cancelled. You can install it later.', 'info');
+    syncInstallButton();
+    return;
+  }
+
+  const ios = isIOS();
+  openModal(`
+    <div class="text-center">
+      <div class="brand-mark mx-auto" style="width:64px;height:64px;border-radius:20px;font-size:26px"><i class="fa-solid fa-robot"></i></div>
+      <h3 class="font-display font-bold text-xl mt-4 mb-1">Install bot class</h3>
+      <p class="text-sm mt-1 mb-5" style="color:var(--muted)">${ios ? 'Add bot class to your iPhone or iPad home screen.' : 'Open bot class like a normal app, with its own icon and offline access.'}</p>
+      <div class="text-left glass-soft rounded-2xl p-4">
+        ${ios ? `
+          <p class="m-0 mb-3 text-sm"><b>1.</b> Open this page in <b>Safari</b>.</p>
+          <p class="m-0 mb-3 text-sm"><b>2.</b> Tap the Share button <i class="fa-solid fa-arrow-up-from-bracket" style="color:var(--primary)"></i>.</p>
+          <p class="m-0 text-sm"><b>3.</b> Scroll down and tap <b>Add to Home Screen</b>, then tap <b>Add</b>.</p>
+        ` : `
+          <p class="m-0 mb-3 text-sm"><b>1.</b> Use Chrome, Edge, or another install-capable browser.</p>
+          <p class="m-0 mb-3 text-sm"><b>2.</b> Open the browser menu <i class="fa-solid fa-ellipsis-vertical" style="color:var(--primary)"></i>.</p>
+          <p class="m-0 text-sm"><b>3.</b> Choose <b>Install bot class</b> or <b>Add to Home screen</b>.</p>
+        `}
+      </div>
+      <p class="text-xs mt-4 mb-0" style="color:var(--faint)"><i class="fa-solid fa-shield-halved" style="color:var(--teal)"></i> GitHub Pages provides the secure HTTPS connection required for installation.</p>
+      <button class="btn btn-primary w-full mt-5" data-action="close-modal"><i class="fa-solid fa-check"></i> Got it</button>
+    </div>`);
+}
+
+(async function registerPwa(){
+  syncInstallButton();
   if (!('serviceWorker' in navigator)) return;
-  const swCode = `
-    const CACHE = 'botclass-v1';
-    self.addEventListener('install', e => { self.skipWaiting(); });
-    self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
-    self.addEventListener('fetch', e => {
-      if (e.request.method !== 'GET') return;
-      e.respondWith(
-        caches.open(CACHE).then(cache => cache.match(e.request).then(hit => {
-          const net = fetch(e.request).then(res => {
-            if (res && res.status === 200 && /^https?:/.test(e.request.url)) {
-              try { cache.put(e.request, res.clone()); } catch(_) {}
-            }
-            return res;
-          }).catch(() => hit);
-          return hit || net;
-        }))
-      );
-    });
-  `;
   try {
-    const blobUrl = URL.createObjectURL(new Blob([swCode], { type:'application/javascript' }));
-    navigator.serviceWorker.register(blobUrl, { scope:'./' })
-      .then(() => console.log('[bot class] inline service worker registered'))
-      .catch(err => console.warn('[bot class] Blob service worker not supported in this browser — app-level offline queue still active.', err.message));
-  } catch(err){ console.warn('[bot class] service worker unavailable', err); }
+    pwaRegistration = await navigator.serviceWorker.register('./sw.js', { scope:'./', updateViaCache:'none' });
+    await navigator.serviceWorker.ready;
+    pwaRegistration.update().catch(() => {});
+    pwaRegistration.addEventListener('updatefound', () => {
+      const worker = pwaRegistration.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller){
+          toast('A new bot class update is ready. It will apply when the app reopens.', 'info', 5200);
+        }
+      });
+    });
+    console.log('[bot class] PWA service worker ready');
+  } catch(err){
+    console.warn('[bot class] service worker registration failed', err);
+  }
 })();
 
 /* ---------------- helpers ---------------- */
@@ -898,11 +982,15 @@ const state = {
 try { state.studentSession = JSON.parse(localStorage.getItem('botclass_student') || 'null'); } catch(_) {}
 
 /* ---------------- theme ---------------- */
-function applyTheme(t){ document.documentElement.dataset.theme = t; try{ localStorage.setItem('botclass_theme', t);}catch(_){}}
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#0a1024' : '#edf1fa');
+  try{ localStorage.setItem('botclass_theme', t); }catch(_){}
+}
 (function initTheme(){
   let t = null; try { t = localStorage.getItem('botclass_theme'); } catch(_) {}
   if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-  document.documentElement.dataset.theme = t;
+  applyTheme(t);
 })();
 
 /* ---------------- toast / loader ---------------- */
@@ -1965,6 +2053,7 @@ function openAdminPhotoModal(){
 
 /* ---------------- delegated events ---------------- */
 const actions = {
+  'install-app': () => installPwa(),
   go: el => {
     const t = el.dataset.target;
     if (t === 'landing') showView('landing');
@@ -2220,7 +2309,17 @@ onAuthStateChanged(auth, user => {
   suggestId(); genPin();
   updateSyncUI();
   refreshPending().then(() => flushQueue());
-  if (state.studentSession){ attachDB(); showView('student'); }
+  const launchView = new URLSearchParams(location.search).get('view');
+  if (state.studentSession) attachDB();
+  if (launchView === 'admin'){
+    showView('login');
+    setLoginTab('admin');
+  } else if (launchView === 'login' && !state.studentSession){
+    showView('login');
+    setLoginTab('student');
+  } else if (state.studentSession){
+    showView('student');
+  }
   // global instructor photo — public listener so every device updates instantly
   applyAdminPhoto(); // instant paint from local cache while the network warms up
   try {

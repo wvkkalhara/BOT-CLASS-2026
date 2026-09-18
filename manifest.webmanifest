@@ -1,0 +1,51 @@
+{
+  "id": "./",
+  "name": "bot class - Robotics and Coding Academy",
+  "short_name": "bot class",
+  "description": "Robotics, coding, attendance, payments, marks, and smart student ID cards for Grades 6 and 7.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#060a18",
+  "theme_color": "#0a1024",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/maskable-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Student login",
+      "short_name": "Student",
+      "description": "Open the student QR login",
+      "url": "./?view=login"
+    },
+    {
+      "name": "Admin console",
+      "short_name": "Admin",
+      "description": "Open the instructor login or console",
+      "url": "./?view=admin"
+    }
+  ],
+  "prefer_related_applications": false
+}
