@@ -18,6 +18,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 /* ============================================================
@@ -378,6 +380,10 @@ main{padding-top:var(--nav-h)}
 .flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .flip-face.backf{transform:rotateY(180deg)}
 .flip-face .idcard{box-shadow:none}
+/* flat variant used for PDF export: square corners + edge-to-edge butt cutting */
+.idcard.flat{border-radius:0;box-shadow:none}
+.idcard.flat .face-ring{background:linear-gradient(135deg,#fbbf24,#14b8a6 55%,#6366f1)}
+.pdf-stage{position:fixed;left:-10000px;top:0;z-index:-1;background:#fff;pointer-events:none}
 /* photo picker (forms & modal) */
 .photo-pick{width:66px;height:66px;border-radius:50%;border:2px dashed var(--border-strong);background:linear-gradient(135deg,var(--primary),var(--primary-2));position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.25s;flex-shrink:0;padding:0}
 .photo-pick:hover{transform:scale(1.06);border-color:var(--primary)}
@@ -385,6 +391,15 @@ main{padding-top:var(--nav-h)}
 .photo-pick-cam{position:absolute;bottom:-2px;right:-4px;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg);z-index:2}
 .photo-preview-lg{width:112px;height:112px;border-radius:50%;margin:0 auto;background:linear-gradient(135deg,var(--primary),var(--teal-bright));display:flex;align-items:center;justify-content:center;border:4px solid var(--surface-strong);box-shadow:0 14px 32px -10px var(--shadow);overflow:hidden}
 .photo-preview-lg img{width:100%;height:100%;object-fit:cover}
+/* clickable avatars with camera badge */
+.stu-ava,.admin-ava{position:relative;cursor:pointer;flex-shrink:0;transition:transform .25s cubic-bezier(.22,1,.36,1);padding:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--font-display);font-weight:700;border:1px solid var(--border-strong);overflow:visible}
+.stu-ava{width:64px;height:64px;border-radius:20px;font-size:23px;background:linear-gradient(135deg,var(--primary),var(--teal-bright))}
+.admin-ava{width:56px;height:56px;border-radius:18px;font-size:19px;background:linear-gradient(135deg,var(--primary),var(--primary-2))}
+.stu-ava:hover,.admin-ava:hover{transform:scale(1.06)}
+.stu-ava img,.admin-ava img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.stu-ava .ava-cam,.admin-ava .ava-cam{position:absolute;bottom:-3px;right:-4px;width:20px;height:20px;border-radius:50%;color:#fff;font-size:8.5px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg);z-index:2}
+.stu-ava .ava-cam{background:linear-gradient(135deg,#d97706,#fbbf24)}
+.admin-ava .ava-cam{background:linear-gradient(135deg,#0d9488,#14b8a6)}
 .card-stage{transform:scale(1);transform-origin:top center}
 @media(max-width:420px){.card-stage{transform:scale(.86)}}
 
@@ -562,7 +577,7 @@ main{padding-top:var(--nav-h)}
       <footer id="instructor" class="container-x" style="padding:clamp(56px,9vh,96px) 0 34px">
         <div class="instr-panel glass-strong reveal">
           <div class="flex flex-col items-center gap-4 text-center md:items-start md:text-left">
-            <div class="instr-avatar">NW</div>
+            <div class="instr-avatar" id="instrAvatar" style="overflow:hidden">NW</div>
             <span class="chip indigo"><i class="fa-solid fa-user-tie"></i> Founder &amp; Instructor</span>
           </div>
           <div>
@@ -584,7 +599,7 @@ main{padding-top:var(--nav-h)}
             <div class="brand-mark" style="width:30px;height:30px;font-size:13px;border-radius:9px"><i class="fa-solid fa-robot"></i></div>
             <span class="font-display font-bold text-sm">bot <span class="grad-text">class</span></span>
           </div>
-          <p class="m-0 text-xs" style="color:var(--faint)">© <span id="yearEl">2026</span> bot class · Robotics &amp; Coding for Grades 6 &amp; 7 · Works offline</p>
+          <p class="m-0 text-xs" style="color:var(--faint)">© <span id="yearEl">2026</span> bot class · Robotics &amp; Coding for Grades 6 &amp; 7</p>
         </div>
       </footer>
     </section>
@@ -664,6 +679,7 @@ main{padding-top:var(--nav-h)}
     <section id="view-admin" class="view">
       <div class="container-x" style="padding-top:clamp(20px,4vh,40px);padding-bottom:64px">
         <div class="flex flex-wrap items-center gap-3 mb-6">
+          <button class="admin-ava" id="adminAvaBtn" data-action="admin-photo" title="Change instructor photo (visible to all students)">NW<span class="ava-cam"><i class="fa-solid fa-camera"></i></span></button>
           <div>
             <h2 class="font-display font-bold m-0" style="font-size:clamp(24px,4vw,32px);letter-spacing:-.02em">Admin <span class="grad-text">Console</span></h2>
             <p class="m-0 text-xs mt-1" style="color:var(--faint)"><i class="fa-solid fa-user-shield" style="color:var(--gold)"></i> Instructor mode · Nadeeka Weerasingha</p>
@@ -770,7 +786,8 @@ main{padding-top:var(--nav-h)}
               <div class="flex flex-col gap-2.5 mt-5">
                 <button class="btn btn-primary" data-action="print-one" id="printOneBtn"><i class="fa-solid fa-print"></i> Print Selected · Front + Back</button>
                 <button class="btn btn-teal" data-action="print-all"><i class="fa-solid fa-layer-group"></i> Print All · Front + Back</button>
-                <p class="text-xs m-0 text-center" style="color:var(--faint)"><i class="fa-solid fa-circle-info"></i> CR80 size (86 × 54 mm), front &amp; back side-by-side per student. Enable “Background graphics”; for duplex printing choose flip on long edge.</p>
+                <button class="btn btn-gold" data-action="export-pdf"><i class="fa-solid fa-file-pdf"></i> Download Cutting PDF</button>
+                <p class="text-xs m-0 text-center" style="color:var(--faint)"><i class="fa-solid fa-scissors"></i> <b>Cutting PDF:</b> page 1 = all fronts, page 2 = matching QR backs (mirrored for duplex). 10 cards per A4 sheet, butted edge-to-edge with no gaps and crop ticks in the margins — ready for a guillotine / cutting machine.</p>
               </div>
             </div>
             <div class="glass dash-card lg:col-span-3 flex flex-col items-center justify-center" style="min-height:400px">
@@ -868,6 +885,7 @@ const initials = n => String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].
 const state = {
   view:'landing',
   data:{ students:{}, attendance:{}, payments:{}, marks:{} },
+  adminPhoto:null,
   dataReady:false,
   admin:null,
   studentSession:null,
@@ -1008,6 +1026,7 @@ async function applyAction(a){
   if (a.type === 'marks')      return set(ref(db, `marks/${a.id}/${a.key}`), a.data);
   if (a.type === 'student')    return set(ref(db, `students/${a.id}`), a.data);
   if (a.type === 'photo')      return set(ref(db, `students/${a.id}/photo`), a.data);
+  if (a.type === 'adminphoto') return set(ref(db, 'site/adminPhoto'), a.data || null);
   throw new Error('Unknown action type');
 }
 async function queueOrWrite(action){
@@ -1235,6 +1254,7 @@ function renderStudentDash(){
     return;
   }
   const id = sess.id;
+  const myPic = getLocalPhoto(id) || s.photo || null;
   const mk = monthKey();
   const payMap = state.data.payments[id] || {};
   const paidNow = !!payMap[mk];
@@ -1277,7 +1297,7 @@ function renderStudentDash(){
 
   wrap.innerHTML = `
     <div class="glass-strong dash-card flex flex-wrap items-center gap-4 mb-5">
-      <div class="avatar" style="width:64px;height:64px;font-size:23px;border-radius:20px;overflow:hidden">${s.photo ? `<img src="${s.photo}" alt="" style="width:100%;height:100%;object-fit:cover"/>` : esc(initials(s.name))}</div>
+      <button class="stu-ava" data-action="my-photo" title="Change my photo (saved on this device)">${myPic ? `<img src="${myPic}" alt=""/>` : esc(initials(s.name))}<span class="ava-cam"><i class="fa-solid fa-camera"></i></span></button>
       <div class="flex-1 min-w-[180px]">
         <p class="m-0 text-xs font-semibold tracking-widest uppercase" style="color:var(--teal)">Welcome back</p>
         <h2 class="font-display font-bold m-0 mt-1" style="font-size:clamp(22px,4vw,30px);letter-spacing:-.02em">${esc(s.name)}</h2>
@@ -1328,7 +1348,7 @@ function renderStudentDash(){
     </div>
 
     <div class="glass-soft dash-card flex flex-wrap items-center gap-3">
-      <div class="act-icon" style="background:var(--gold-soft);color:var(--gold)"><i class="fa-solid fa-phone"></i></div>
+      ${state.adminPhoto ? `<img src="${esc(resolveImageUrl(state.adminPhoto))}" alt="Instructor" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--gold-accent);flex-shrink:0"/>` : `<div class="act-icon" style="background:var(--gold-soft);color:var(--gold)"><i class="fa-solid fa-user-tie"></i></div>`}
       <div class="flex-1 min-w-[200px]">
         <p class="m-0 text-sm font-semibold">Need help? Contact your instructor</p>
         <p class="m-0 text-xs" style="color:var(--muted)">Nadeeka Weerasingha · bot class</p>
@@ -1633,6 +1653,89 @@ function printCards(ids){
   toast(`Sending ${ids.length} card${ids.length>1?'s':''} (front + back) to the printer…`, 'info', 2400);
   setTimeout(() => { try { window.print(); } catch(e) { console.warn(e); } }, 120);
 }
+
+/* ---------------- cutting-ready PDF export ----------------
+   A4 portrait · CR80 cards (85.6 × 54 mm) · 2 cols × 5 rows = 10 per sheet
+   Page 1 -> fronts, Page 2 -> backs (columns mirrored so duplex printing aligns)
+   Cards butt edge-to-edge (no gutters) with crop ticks only in the outer margins. */
+const PDF_CFG = { CW:85.6, CH:54, COLS:2, ROWS:5, PW:210, PH:297 };
+function drawCropMarks(pdf, ox, oy, gridW, gridH){
+  const { CW, CH, COLS, ROWS } = PDF_CFG;
+  pdf.setDrawColor(150); pdf.setLineWidth(0.15);
+  const T = 3.5, GAP = 1.2;
+  for (let c = 0; c <= COLS; c++){
+    const x = ox + c * CW;
+    pdf.line(x, oy - GAP - T, x, oy - GAP);
+    pdf.line(x, oy + gridH + GAP, x, oy + gridH + GAP + T);
+  }
+  for (let r = 0; r <= ROWS; r++){
+    const y = oy + r * CH;
+    pdf.line(ox - GAP - T, y, ox - GAP, y);
+    pdf.line(ox + gridW + GAP, y, ox + gridW + GAP + T, y);
+  }
+}
+async function exportCardsPDF(ids){
+  if (!ids.length){ toast('No students to export.', 'error'); return; }
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!JsPDF || !window.html2canvas){
+    toast('PDF tools could not load (you may be offline). Reconnect and try again, or use the Print buttons.', 'error', 5200);
+    return;
+  }
+  const { CW, CH, COLS, ROWS, PW, PH } = PDF_CFG;
+  const PER = COLS * ROWS, gridW = CW * COLS, gridH = CH * ROWS;
+  const ox = (PW - gridW) / 2, oy = (PH - gridH) / 2;
+
+  const stage = document.createElement('div');
+  stage.className = 'pdf-stage';
+  document.body.appendChild(stage);
+
+  const shoot = async el => {
+    el.classList.add('flat');
+    stage.innerHTML = '';
+    stage.appendChild(el);
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
+    const canvas = await html2canvas(el, { scale:3, useCORS:true, allowTaint:false, backgroundColor:'#141a3f', logging:false, width:352, height:222, windowWidth:352 });
+    return canvas.toDataURL('image/jpeg', 0.94);
+  };
+
+  setLoader(true, 'Preparing cards…');
+  try {
+    const pdf = new JsPDF({ unit:'mm', format:'a4', orientation:'portrait', compress:true });
+    const sheets = Math.ceil(ids.length / PER);
+    const total = ids.length * 2;
+    let done = 0;
+    for (let s = 0; s < sheets; s++){
+      const chunk = ids.slice(s * PER, (s + 1) * PER);
+      if (s > 0) pdf.addPage();
+      // --- page A: fronts ---
+      for (let i = 0; i < chunk.length; i++){
+        const id = chunk[i], st = findStudent(id); if (!st) continue;
+        const r = Math.floor(i / COLS), c = i % COLS;
+        pdf.addImage(await shoot(cardFront(id, st)), 'JPEG', ox + c * CW, oy + r * CH, CW, CH, undefined, 'FAST');
+        setLoader(true, `Rendering cards… ${++done} / ${total}`);
+      }
+      drawCropMarks(pdf, ox, oy, gridW, gridH);
+      // --- page B: backs (columns mirrored for long-edge duplex) ---
+      pdf.addPage();
+      for (let i = 0; i < chunk.length; i++){
+        const id = chunk[i], st = findStudent(id); if (!st) continue;
+        const r = Math.floor(i / COLS), c = (COLS - 1) - (i % COLS);
+        pdf.addImage(await shoot(cardBack(id, st)), 'JPEG', ox + c * CW, oy + r * CH, CW, CH, undefined, 'FAST');
+        setLoader(true, `Rendering cards… ${++done} / ${total}`);
+      }
+      drawCropMarks(pdf, ox, oy, gridW, gridH);
+    }
+    setLoader(true, 'Building PDF file…');
+    pdf.save(`bot-class-id-cards-${todayKey()}.pdf`);
+    toast(`PDF ready — ${ids.length} card${ids.length>1?'s':''} across ${sheets * 2} page${sheets*2>1?'s':''}.`, 'success', 4600);
+  } catch(err){
+    console.warn('PDF export failed', err);
+    toast('Could not build the PDF: ' + (err.message || 'unknown error'), 'error', 5200);
+  } finally {
+    stage.remove();
+    setLoader(false);
+  }
+}
 window.addEventListener('afterprint', () => { /* keep sheet for re-print; nothing to clean */ });
 
 /* ---------------- admin: add / delete student ---------------- */
@@ -1734,6 +1837,132 @@ function openPhotoModal(id){
   });
 }
 
+/* ---------------- student local photo (this device only) ---------------- */
+let myPhotoCtx = null;
+function myPhotoKey(id){ return 'botclass_myphoto_' + id; }
+function getLocalPhoto(id){ try { return localStorage.getItem(myPhotoKey(id)) || null; } catch(_) { return null; } }
+function setLocalPhoto(id, url){
+  try { if (url) localStorage.setItem(myPhotoKey(id), url); else localStorage.removeItem(myPhotoKey(id)); }
+  catch(e){ if (url) toast('Could not store the image on this device (storage full).', 'error'); }
+}
+function mpPreviewHtml(){ return myPhotoCtx.next ? `<img src="${myPhotoCtx.next}" alt=""/>` : `<span class="font-display font-bold" style="font-size:30px;color:#fff">${esc(initials(myPhotoCtx.name))}</span>`; }
+function openMyPhotoModal(){
+  const sess = state.studentSession;
+  if (!sess) return;
+  const s = findStudent(sess.id) || { name: sess.name };
+  const local = getLocalPhoto(sess.id);
+  myPhotoCtx = { id: sess.id, name: s.name || sess.name, next: local };
+  openModal(`
+    <div class="text-center">
+      <div class="photo-preview-lg" id="mpPrev">${mpPreviewHtml()}</div>
+      <h3 class="font-display font-bold text-lg mt-4 mb-1">${esc(myPhotoCtx.name)}</h3>
+      <p class="mono text-xs m-0 mb-4" style="color:var(--faint)">${esc(myPhotoCtx.id)}</p>
+      <input type="file" id="mpFile" accept="image/*" hidden />
+      <div class="flex gap-2.5 justify-center flex-wrap">
+        <button class="btn btn-ghost btn-sm" data-action="mp-browse"><i class="fa-solid fa-image"></i> Choose Photo</button>
+        <button class="btn btn-ghost btn-sm" data-action="mp-remove" id="mpRemoveBtn" style="color:var(--danger);${local ? '' : 'display:none'}"><i class="fa-solid fa-trash"></i> Remove</button>
+      </div>
+      <div class="flex gap-2.5 mt-5">
+        <button class="btn btn-ghost flex-1" data-action="close-modal"><i class="fa-solid fa-xmark"></i> Cancel</button>
+        <button class="btn btn-teal flex-1" data-action="mp-save"><i class="fa-solid fa-check"></i> Save to This Device</button>
+      </div>
+      <p class="text-xs mt-3 m-0" style="color:var(--faint)"><i class="fa-solid fa-mobile-screen"></i> Saved in this browser’s local storage — your photo will still be here after you reload the app.</p>
+    </div>`);
+  $('#mpFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (f){
+      try {
+        myPhotoCtx.next = await compressPhoto(f);
+        $('#mpPrev').innerHTML = mpPreviewHtml();
+        const r = $('#mpRemoveBtn'); if (r) r.style.display = '';
+      } catch(err){ toast(err.message || 'Could not use that image.', 'error'); }
+    }
+    e.target.value = '';
+  });
+}
+
+/* ---------------- instructor photo (global, cloud-hosted URL) ---------------- */
+let adminPhotoCtx = null;
+const ADMIN_PHOTO_CACHE = 'botclass_adminphoto';
+/* Convert common share-page links into true direct-image URLs so <img> can render them */
+function resolveImageUrl(url){
+  let u = String(url || '').trim();
+  if (!u) return '';
+  const m = u.match(/drive\.google\.com\/file\/d\/([-\w]+)/)
+        || u.match(/drive\.google\.com\/(?:uc|open|thumbnail)\?[^#]*?[?&]id=([-\w]+)/);
+  if (m) return `https://lh3.googleusercontent.com/d/${m[1]}=w600`;
+  if (/^https?:\/\/(www\.)?dropbox\.com\//.test(u)){
+    u = u.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/([&?])dl=0/, '$1raw=1');
+  }
+  return u;
+}
+const isDriveLink = u => /drive\.google\.com/.test(u || '');
+function applyAdminPhoto(){
+  if (!state.adminPhoto){ try { state.adminPhoto = localStorage.getItem(ADMIN_PHOTO_CACHE) || null; } catch(_) {} }
+  const url = resolveImageUrl(state.adminPhoto);
+  const fa = $('#instrAvatar');
+  if (fa) fa.innerHTML = url ? `<img src="${esc(url)}" alt="Instructor photo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"/>` : 'NW';
+  const ab = $('#adminAvaBtn');
+  if (ab) ab.innerHTML = (url ? `<img src="${esc(url)}" alt=""/>` : 'NW') + '<span class="ava-cam"><i class="fa-solid fa-camera"></i></span>';
+  if (state.view === 'student') renderStudentDash();
+}
+function cacheAdminPhoto(url){
+  try { if (url) localStorage.setItem(ADMIN_PHOTO_CACHE, url); else localStorage.removeItem(ADMIN_PHOTO_CACHE); } catch(_) {}
+}
+function openAdminPhotoModal(){
+  const cur = state.adminPhoto || null;
+  adminPhotoCtx = { url: cur };
+  openModal(`
+    <div class="text-center">
+      <div class="photo-preview-lg" id="apPrev">${cur ? `<img src="${esc(resolveImageUrl(cur))}" alt=""/>` : `<span class="font-display font-bold" style="font-size:28px;color:#fff">NW</span>`}</div>
+      <h3 class="font-display font-bold text-lg mt-4 mb-1">Instructor Photo</h3>
+      <p class="text-xs m-0 mb-4" style="color:var(--muted)">Shown to <b>every student</b> across the whole app — instantly.</p>
+      <input type="file" id="apFile" accept="image/*" hidden />
+      <div class="flex gap-2.5 justify-center flex-wrap">
+        <button class="btn btn-ghost btn-sm" data-action="ap-browse"><i class="fa-solid fa-image"></i> Choose Photo</button>
+        <button class="btn btn-ghost btn-sm" data-action="ap-remove" id="apRemoveBtn" style="color:var(--danger);${cur ? '' : 'display:none'}"><i class="fa-solid fa-trash"></i></button>
+      </div>
+      <div class="text-left mt-5">
+        <label class="field-label" for="apUrl"><i class="fa-solid fa-cloud-arrow-up"></i> Cloud image URL</label>
+        <input class="field mono" id="apUrl" style="font-size:12px" placeholder="https://i.postimg.cc/…/instructor.png" value="${esc(cur || '')}" />
+        <p class="text-xs mt-2 m-0" id="apNote" style="color:var(--gold);${isDriveLink(cur) ? '' : 'display:none'}"><i class="fa-solid fa-circle-exclamation"></i> Google Drive link detected — it will be converted automatically. In Drive, set the file’s sharing to “Anyone with the link”.</p>
+        <p class="text-xs mt-2 m-0" style="color:var(--faint)">This app is hosted on GitHub Pages (static), so photos cannot be uploaded directly. Upload the image to a host like postimages.org, imgur or Google Drive, then paste the link here and save. <b>Google Drive share links are converted automatically.</b></p>
+      </div>
+      <div class="flex gap-2.5 mt-5">
+        <button class="btn btn-ghost flex-1" data-action="close-modal"><i class="fa-solid fa-xmark"></i> Cancel</button>
+        <button class="btn btn-primary flex-1" data-action="ap-save"><i class="fa-solid fa-globe"></i> Save &amp; Publish</button>
+      </div>
+    </div>`);
+  $('#apFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (f){
+      try {
+        const localPreview = await compressPhoto(f);
+        $('#apPrev').innerHTML = `<img src="${localPreview}" alt=""/>`;
+        alert('Please upload this image manually to the cloud first.');
+      } catch(err){ toast(err.message || 'Could not use that image.', 'error'); }
+    }
+    e.target.value = '';
+  });
+  $('#apUrl').addEventListener('input', () => {
+    const raw = $('#apUrl').value.trim();
+    const prev = $('#apPrev');
+    const note = $('#apNote');
+    if (note) note.style.display = isDriveLink(raw) ? '' : 'none';
+    prev.innerHTML = '';
+    const v = resolveImageUrl(raw);
+    if (v){
+      const im = document.createElement('img');
+      im.alt = '';
+      im.onerror = () => { prev.innerHTML = `<span class="font-mono text-center" style="font-size:10px;color:#fff;opacity:.85;line-height:1.4;padding:6px">no preview — check link &amp; public sharing</span>`; };
+      im.src = v;
+      prev.appendChild(im);
+    } else {
+      prev.innerHTML = `<span class="font-display font-bold" style="font-size:28px;color:#fff">NW</span>`;
+    }
+  });
+}
+
 /* ---------------- delegated events ---------------- */
 const actions = {
   go: el => {
@@ -1827,6 +2056,7 @@ const actions = {
   'card-select': el => { state.cardSel = el.dataset.id; renderCardChips(); renderCardPreview(); },
   'print-one': () => { if (state.cardSel) printCards([state.cardSel]); },
   'print-all': () => printCards(Object.keys(state.data.students).sort((a,b) => a.localeCompare(b, undefined, { numeric:true }))),
+  'export-pdf': () => exportCardsPDF(Object.keys(state.data.students).sort((a,b) => a.localeCompare(b, undefined, { numeric:true }))),
   'suggest-id': () => suggestId(),
   'gen-pin': () => genPin(),
   'flip-card': () => $('#flipwrap')?.classList.toggle('flipped'),
@@ -1845,6 +2075,46 @@ const actions = {
     await queueOrWrite({ type:'photo', id, data: next ?? null });
     closeModal();
     toast(next ? `Photo saved for ${name}.` : `Photo removed for ${name}.`, 'success');
+  },
+  /* instructor global photo */
+  'admin-photo': () => openAdminPhotoModal(),
+  'ap-browse': () => $('#apFile')?.click(),
+  'ap-remove': () => {
+    if (!adminPhotoCtx) return;
+    adminPhotoCtx.url = null;
+    const inp = $('#apUrl'); if (inp) inp.value = '';
+    const pv = $('#apPrev'); if (pv) pv.innerHTML = `<span class="font-display font-bold" style="font-size:28px;color:#fff">NW</span>`;
+    const r = $('#apRemoveBtn'); if (r) r.style.display = 'none';
+  },
+  'ap-save': async () => {
+    const raw = ($('#apUrl')?.value || '').trim();
+    if (raw && !/^https?:\/\//i.test(raw)){ toast('Please paste a full image URL starting with http:// or https://', 'error', 4200); $('#apUrl')?.focus(); return; }
+    const url = resolveImageUrl(raw);
+    const converted = !!(url && url !== raw);
+    state.adminPhoto = url || null;
+    cacheAdminPhoto(state.adminPhoto);
+    applyAdminPhoto();
+    await queueOrWrite({ type:'adminphoto', id:'adminphoto', data: state.adminPhoto });
+    closeModal();
+    if (!state.adminPhoto) toast('Instructor photo removed; the “NW” avatar is back.', 'success');
+    else if (converted) toast('Drive link converted automatically — instructor photo published to all devices.', 'success');
+    else toast('Instructor photo published — every student will now see it.', 'success');
+  },
+  /* student device-local photo */
+  'my-photo': () => openMyPhotoModal(),
+  'mp-browse': () => $('#mpFile')?.click(),
+  'mp-remove': () => {
+    if (!myPhotoCtx) return;
+    myPhotoCtx.next = null;
+    const pv = $('#mpPrev'); if (pv) pv.innerHTML = mpPreviewHtml();
+    const r = $('#mpRemoveBtn'); if (r) r.style.display = 'none';
+  },
+  'mp-save': () => {
+    if (!myPhotoCtx) return;
+    setLocalPhoto(myPhotoCtx.id, myPhotoCtx.next);
+    closeModal();
+    renderStudentDash();
+    toast(myPhotoCtx.next ? 'Your photo was saved on this device.' : 'Your local photo was removed.', 'success');
   },
 };
 document.addEventListener('click', e => {
@@ -1951,6 +2221,15 @@ onAuthStateChanged(auth, user => {
   updateSyncUI();
   refreshPending().then(() => flushQueue());
   if (state.studentSession){ attachDB(); showView('student'); }
+  // global instructor photo — public listener so every device updates instantly
+  applyAdminPhoto(); // instant paint from local cache while the network warms up
+  try {
+    onValue(ref(db, 'site/adminPhoto'), snap => {
+      state.adminPhoto = snap.val() || null;
+      cacheAdminPhoto(state.adminPhoto);
+      applyAdminPhoto();
+    }, err => console.warn('admin photo listener', err));
+  } catch(e){ console.warn('admin photo listener unavailable', e); }
   // reveal-on-scroll
   const io = new IntersectionObserver(entries => {
     entries.forEach(en => { if (en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
